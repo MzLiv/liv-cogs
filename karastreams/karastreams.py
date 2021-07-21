@@ -31,12 +31,12 @@ from datetime import datetime
 from collections import defaultdict
 from typing import Optional, List, Tuple, Union, Dict
 
-_ = Translator("R9Streams", __file__)
-log = logging.getLogger("red.core.cogs.R9Streams")
+_ = Translator("KaraStreams", __file__)
+log = logging.getLogger("red.core.cogs.KaraStreams")
 
 
 @cog_i18n(_)
-class R9Streams(commands.Cog):
+class KaraStreams(commands.Cog):
     """Various commands relating to streaming platforms.
 
     You can check if a Twitch, YouTube or Picarto stream is
@@ -46,7 +46,7 @@ class R9Streams(commands.Cog):
     global_defaults = {
         "refresh_timer": 300,
         "tokens": {},
-        "r9streams": [],
+        "karastreams": [],
         "notified_owner_missing_twitch_secret": False,
     }
 
@@ -72,7 +72,7 @@ class R9Streams(commands.Cog):
 
         self.bot: Red = bot
 
-        self.r9streams: List[R9Stream] = []
+        self.karastreams: List[KaraStream] = []
         self.task: Optional[asyncio.Task] = None
 
         self.yt_cid_pattern = re.compile("^UC[-_A-Za-z0-9]{21}[AQgw]$")
@@ -97,10 +97,10 @@ class R9Streams(commands.Cog):
         try:
             await self.move_api_keys()
             await self.get_twitch_bearer_token()
-            self.r9streams = await self.load_r9streams()
+            self.karastreams = await self.load_karastreams()
             self.task = self.bot.loop.create_task(self._stream_alerts())
         except Exception as error:
-            log.exception("Failed to initialize R9Streams cog:", exc_info=error)
+            log.exception("Failed to initialize KaraStreams cog:", exc_info=error)
 
         self._ready_event.set()
 
@@ -204,7 +204,7 @@ class R9Streams(commands.Cog):
 
     @commands.guild_only()
     @commands.command()
-    async def r9twitchstream(self, ctx: commands.Context, channel_name: str):
+    async def karatwitchstream(self, ctx: commands.Context, channel_name: str):
         """Check if a Twitch channel is live."""
         await self.maybe_renew_twitch_bearer_token()
         token = (await self.bot.get_shared_api_tokens("twitch")).get("client_id")
@@ -219,7 +219,7 @@ class R9Streams(commands.Cog):
     @commands.guild_only()
     @commands.command()
     @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def r9youtubestream(self, ctx: commands.Context, channel_id_or_name: str):
+    async def karayoutubestream(self, ctx: commands.Context, channel_id_or_name: str):
         """Check if a YouTube channel is live."""
         # TODO: Write up a custom check to look up cooldown set by botowner
         # This check is here to avoid people spamming this command and eating up quota
@@ -237,7 +237,7 @@ class R9Streams(commands.Cog):
 
     @commands.guild_only()
     @commands.command()
-    async def r9picarto(self, ctx: commands.Context, channel_name: str):
+    async def karapicarto(self, ctx: commands.Context, channel_name: str):
         """Check if a Picarto channel is live."""
         stream = PicartoStream(_bot=self.bot, name=channel_name)
         await self.check_online(ctx, stream)
@@ -256,14 +256,14 @@ class R9Streams(commands.Cog):
         except InvalidTwitchCredentials:
             await ctx.send(
                 _("The Twitch token is either invalid or has not been set. See {command}.").format(
-                    command=f"`{ctx.clean_prefix}r9streamset twitchtoken`"
+                    command=f"`{ctx.clean_prefix}karastreamset twitchtoken`"
                 )
             )
         except InvalidYoutubeCredentials:
             await ctx.send(
                 _(
                     "The YouTube API key is either invalid or has not been set. See {command}."
-                ).format(command=f"`{ctx.clean_prefix}r9streamset youtubekey`")
+                ).format(command=f"`{ctx.clean_prefix}karastreamset youtubekey`")
             )
         except YoutubeQuotaExceeded:
             await ctx.send(
@@ -295,11 +295,11 @@ class R9Streams(commands.Cog):
     @commands.group()
     @commands.guild_only()
     @checks.mod_or_permissions(manage_channels=True)
-    async def r9streamalert(self, ctx: commands.Context):
+    async def karastreamalert(self, ctx: commands.Context):
         """Manage automated stream alerts."""
         pass
 
-    @r9streamalert.group(name="twitch", invoke_without_command=True)
+    @karastreamalert.group(name="twitch", invoke_without_command=True)
     async def _twitch(self, ctx: commands.Context, channel_name: str):
         """Manage Twitch stream notifications."""
         await ctx.invoke(self.twitch_alert_channel, channel_name)
@@ -314,31 +314,31 @@ class R9Streams(commands.Cog):
             return
         await self.stream_alert(ctx, TwitchStream, channel_name.lower())
 
-    @r9streamalert.command(name="youtube")
+    @karastreamalert.command(name="youtube")
     async def youtube_alert(self, ctx: commands.Context, channel_name_or_id: str):
         """Toggle alerts in this channel for a YouTube stream."""
         await self.stream_alert(ctx, YoutubeStream, channel_name_or_id)
 
-    @r9streamalert.command(name="picarto")
+    @karastreamalert.command(name="picarto")
     async def picarto_alert(self, ctx: commands.Context, channel_name: str):
         """Toggle alerts in this channel for a Picarto stream."""
         await self.stream_alert(ctx, PicartoStream, channel_name)
 
-    @r9streamalert.command(name="stop", usage="[disable_all=No]")
-    async def r9streamalert_stop(self, ctx: commands.Context, _all: bool = False):
+    @karastreamalert.command(name="stop", usage="[disable_all=No]")
+    async def karastreamalert_stop(self, ctx: commands.Context, _all: bool = False):
         """Disable all stream alerts in this channel or server.
 
-        `[p]r9streamalert stop` will disable this channel's stream
+        `[p]karastreamalert stop` will disable this channel's stream
         alerts.
 
-        Do `[p]r9streamalert stop yes` to disable all stream alerts in
+        Do `[p]karastreamalert stop yes` to disable all stream alerts in
         this server.
         """
-        r9streams = self.r9streams.copy()
+        karastreams = self.karastreams.copy()
         local_channel_ids = [c.id for c in ctx.guild.channels]
         to_remove = []
 
-        for stream in r9streams:
+        for stream in karastreams:
             for channel_id in stream.channels:
                 if channel_id == ctx.channel.id:
                     stream.channels.remove(channel_id)
@@ -350,10 +350,10 @@ class R9Streams(commands.Cog):
                 to_remove.append(stream)
 
         for stream in to_remove:
-            r9streams.remove(stream)
+            karastreams.remove(stream)
 
-        self.r9streams = r9streams
-        await self.save_r9streams()
+        self.karastreams = karastreams
+        await self.save_karastreams()
 
         if _all:
             msg = _("All the stream alerts in this server have been disabled.")
@@ -362,25 +362,25 @@ class R9Streams(commands.Cog):
 
         await ctx.send(msg)
 
-    @r9streamalert.command(name="list")
-    async def r9streamalert_list(self, ctx: commands.Context):
+    @karastreamalert.command(name="list")
+    async def karastreamalert_list(self, ctx: commands.Context):
         """List all active stream alerts in this server."""
-        r9streams_list = defaultdict(list)
+        karastreams_list = defaultdict(list)
         guild_channels_ids = [c.id for c in ctx.guild.channels]
         msg = _("Active alerts:\n\n")
 
-        for stream in self.r9streams:
+        for stream in self.karastreams:
             for channel_id in stream.channels:
                 if channel_id in guild_channels_ids:
-                    r9streams_list[channel_id].append(stream.name.lower())
+                    karastreams_list[channel_id].append(stream.name.lower())
 
-        if not r9streams_list:
+        if not karastreams_list:
             await ctx.send(_("There are no active alerts in this server."))
             return
 
-        for channel_id, r9streams in r9streams_list.items():
+        for channel_id, karastreams in karastreams_list.items():
             channel = ctx.guild.get_channel(channel_id)
-            msg += "** - #{}**\n{}\n".format(channel, ", ".join(r9streams))
+            msg += "** - #{}**\n{}\n".format(channel, ", ".join(karastreams))
 
         for page in pagify(msg):
             await ctx.send(page)
@@ -414,7 +414,7 @@ class R9Streams(commands.Cog):
                 await ctx.send(
                     _(
                         "The Twitch token is either invalid or has not been set. See {command}."
-                    ).format(command=f"`{ctx.clean_prefix}r9streamset twitchtoken`")
+                    ).format(command=f"`{ctx.clean_prefix}karastreamset twitchtoken`")
                 )
                 return
             except InvalidYoutubeCredentials:
@@ -422,7 +422,7 @@ class R9Streams(commands.Cog):
                     _(
                         "The YouTube API key is either invalid or has not been set. See "
                         "{command}."
-                    ).format(command=f"`{ctx.clean_prefix}r9streamset youtubekey`")
+                    ).format(command=f"`{ctx.clean_prefix}karastreamset youtubekey`")
                 )
                 return
             except YoutubeQuotaExceeded:
@@ -451,13 +451,13 @@ class R9Streams(commands.Cog):
 
     @commands.group()
     @checks.mod_or_permissions(manage_channels=True)
-    async def r9streamset(self, ctx: commands.Context):
+    async def karastreamset(self, ctx: commands.Context):
         """Manage stream alert settings."""
         pass
 
-    @r9streamset.command(name="timer")
+    @karastreamset.command(name="timer")
     @checks.is_owner()
-    async def _r9streamset_refresh_timer(self, ctx: commands.Context, refresh_time: int):
+    async def _karastreamset_refresh_timer(self, ctx: commands.Context, refresh_time: int):
         """Set stream check refresh time."""
         if refresh_time < 60:
             return await ctx.send(_("You cannot set the refresh timer to less than 60 seconds"))
@@ -467,7 +467,7 @@ class R9Streams(commands.Cog):
             _("Refresh timer set to {refresh_time} seconds".format(refresh_time=refresh_time))
         )
 
-    @r9streamset.command()
+    @karastreamset.command()
     @checks.is_owner()
     async def twitchtoken(self, ctx: commands.Context):
         """Explain how to set the twitch token."""
@@ -491,7 +491,7 @@ class R9Streams(commands.Cog):
 
         await ctx.maybe_send_embed(message)
 
-    @r9streamset.command()
+    @karastreamset.command()
     @checks.is_owner()
     async def youtubekey(self, ctx: commands.Context):
         """Explain how to set the YouTube token."""
@@ -516,7 +516,7 @@ class R9Streams(commands.Cog):
 
         await ctx.maybe_send_embed(message)
 
-    @r9streamset.group()
+    @karastreamset.group()
     @commands.guild_only()
     async def message(self, ctx: commands.Context):
         """Manage custom messages for stream alerts."""
@@ -531,7 +531,7 @@ class R9Streams(commands.Cog):
         Use `{stream}` in the message to insert the channel or username.
         Use `{stream.display_name}` in the message to insert the channel's display name (on Twitch, this may be different from `{stream}`).
 
-        For example: `[p]r9streamset message mention {mention}, {stream.display_name} is live!`
+        For example: `[p]karastreamset message mention {mention}, {stream.display_name} is live!`
         """
         guild = ctx.guild
         await self.config.guild(guild).live_message_mention.set(message)
@@ -545,7 +545,7 @@ class R9Streams(commands.Cog):
         Use `{stream}` in the message to insert the channel or username.
         Use `{stream.display_name}` in the message to insert the channel's display name (on Twitch, this may be different from `{stream}`).
 
-        For example: `[p]r9streamset message nomention {stream.display_name} is live!`
+        For example: `[p]karastreamset message nomention {stream.display_name} is live!`
         """
         guild = ctx.guild
         await self.config.guild(guild).live_message_nomention.set(message)
@@ -560,7 +560,7 @@ class R9Streams(commands.Cog):
         await self.config.guild(guild).live_message_nomention.set(False)
         await ctx.send(_("Stream alerts in this server will now use the default alert message."))
 
-    @r9streamset.group()
+    @karastreamset.group()
     @commands.guild_only()
     async def mention(self, ctx: commands.Context):
         """Manage mention settings for stream alerts."""
@@ -612,13 +612,13 @@ class R9Streams(commands.Cog):
             if not role.mentionable:
                 msg += " " + _(
                     "Since the role is not mentionable, it will be momentarily made mentionable "
-                    "when announcing a r9streamalert. Please make sure I have the correct "
+                    "when announcing a karastreamalert. Please make sure I have the correct "
                     "permissions to manage this role, or else members of this role won't receive "
                     "a notification."
                 )
             await ctx.send(msg)
 
-    @r9streamset.command()
+    @karastreamset.command()
     @commands.guild_only()
     async def autodelete(self, ctx: commands.Context, on_off: bool):
         """Toggle alert deletion for when streams go offline."""
@@ -628,7 +628,7 @@ class R9Streams(commands.Cog):
         else:
             await ctx.send(_("Notifications will no longer be deleted."))
 
-    @r9streamset.command(name="ignorereruns")
+    @karastreamset.command(name="ignorereruns")
     @commands.guild_only()
     async def ignore_reruns(self, ctx: commands.Context):
         """Toggle excluding rerun streams from alerts."""
@@ -641,7 +641,7 @@ class R9Streams(commands.Cog):
             await self.config.guild(guild).ignore_reruns.set(True)
             await ctx.send(_("Streams of type 'rerun' will no longer send an alert."))
 
-    @r9streamset.command(name="ignoreschedule")
+    @karastreamset.command(name="ignoreschedule")
     @commands.guild_only()
     async def ignore_schedule(self, ctx: commands.Context):
         """Toggle excluding YouTube streams schedules from alerts."""
@@ -657,8 +657,8 @@ class R9Streams(commands.Cog):
     async def add_or_remove(self, ctx: commands.Context, stream):
         if ctx.channel.id not in stream.channels:
             stream.channels.append(ctx.channel.id)
-            if stream not in self.r9streams:
-                self.r9streams.append(stream)
+            if stream not in self.karastreams:
+                self.karastreams.append(stream)
             await ctx.send(
                 _(
                     "I'll now send a notification in this channel when {stream.name} is live."
@@ -667,17 +667,17 @@ class R9Streams(commands.Cog):
         else:
             stream.channels.remove(ctx.channel.id)
             if not stream.channels:
-                self.r9streams.remove(stream)
+                self.karastreams.remove(stream)
             await ctx.send(
                 _(
                     "I won't send notifications about {stream.name} in this channel anymore."
                 ).format(stream=stream)
             )
 
-        await self.save_r9streams()
+        await self.save_karastreams()
 
     def get_stream(self, _class, name):
-        for stream in self.r9streams:
+        for stream in self.karastreams:
             # if isinstance(stream, _class) and stream.name == name:
             #    return stream
             # Reloading this cog causes an issue with this check ^
@@ -708,7 +708,7 @@ class R9Streams(commands.Cog):
     async def _stream_alerts(self):
         await self.bot.wait_until_ready()
         while True:
-            await self.check_r9streams()
+            await self.check_karastreams()
             await asyncio.sleep(await self.config.refresh_timer())
 
     async def _send_stream_alert(
@@ -730,9 +730,9 @@ class R9Streams(commands.Cog):
             message_data["is_schedule"] = True
         stream.messages.append(message_data)
 
-    async def check_r9streams(self):
+    async def check_karastreams(self):
         to_remove = []
-        for stream in self.r9streams:
+        for stream in self.karastreams:
             try:
                 try:
                     is_rerun = False
@@ -767,7 +767,7 @@ class R9Streams(commands.Cog):
                             await partial_msg.delete()
 
                     stream.messages.clear()
-                    await self.save_r9streams()
+                    await self.save_karastreams()
                 except APIError as e:
                     log.error(
                         "Something went wrong whilst trying to contact the stream service's API.\n"
@@ -793,7 +793,7 @@ class R9Streams(commands.Cog):
                         if is_schedule:
                             # skip messages and mentions
                             await self._send_stream_alert(stream, channel, embed, is_schedule=True)
-                            await self.save_r9streams()
+                            await self.save_karastreams()
                             continue
                         await set_contextual_locales_from_guild(self.bot, channel.guild)
 
@@ -849,14 +849,14 @@ class R9Streams(commands.Cog):
                         if edited_roles:
                             for role in edited_roles:
                                 await role.edit(mentionable=False)
-                        await self.save_r9streams()
+                        await self.save_karastreams()
             except Exception as e:
-                log.error("An error has occured with R9Streams. Please report it.", exc_info=e)
+                log.error("An error has occured with KaraStreams. Please report it.", exc_info=e)
 
         if to_remove:
             for stream in to_remove:
-                self.r9streams.remove(stream)
-            await self.save_r9streams()
+                self.karastreams.remove(stream)
+            await self.save_karastreams()
 
     async def _get_mention_str(
         self, guild: discord.Guild, channel: discord.TextChannel
@@ -886,11 +886,11 @@ class R9Streams(commands.Cog):
                 mentions.append(role.mention)
         return " ".join(mentions), edited_roles
 
-    async def filter_r9streams(self, r9streams: list, channel: discord.TextChannel) -> list:
+    async def filter_karastreams(self, karastreams: list, channel: discord.TextChannel) -> list:
         filtered = []
-        for stream in r9streams:
+        for stream in karastreams:
             tw_id = str(stream["channel"]["_id"])
-            for alert in self.r9streams:
+            for alert in self.karastreams:
                 if isinstance(alert, TwitchStream) and alert.id == tw_id:
                     if channel.id in alert.channels:
                         break
@@ -898,9 +898,9 @@ class R9Streams(commands.Cog):
                 filtered.append(stream)
         return filtered
 
-    async def load_r9streams(self):
-        r9streams = []
-        for raw_stream in await self.config.r9streams():
+    async def load_karastreams(self):
+        karastreams = []
+        for raw_stream in await self.config.karastreams():
             _class = getattr(_streamtypes, raw_stream["type"], None)
             if not _class:
                 continue
@@ -914,16 +914,16 @@ class R9Streams(commands.Cog):
                         raw_stream["config"] = self.config
                     raw_stream["token"] = token
             raw_stream["_bot"] = self.bot
-            r9streams.append(_class(**raw_stream))
+            karastreams.append(_class(**raw_stream))
 
-        return r9streams
+        return karastreams
 
-    async def save_r9streams(self):
-        raw_r9streams = []
-        for stream in self.r9streams:
-            raw_r9streams.append(stream.export())
+    async def save_karastreams(self):
+        raw_karastreams = []
+        for stream in self.karastreams:
+            raw_karastreams.append(stream.export())
 
-        await self.config.r9streams.set(raw_r9streams)
+        await self.config.karastreams.set(raw_karastreams)
 
     def cog_unload(self):
         if self.task:
