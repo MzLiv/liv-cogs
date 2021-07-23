@@ -72,7 +72,7 @@ class KaraStreams(commands.Cog):
 
         self.bot: Red = bot
 
-        self.karastreams: List[KaraStream] = []
+        self.karastreams: List[Stream] = []
         self.task: Optional[asyncio.Task] = None
 
         self.yt_cid_pattern = re.compile("^UC[-_A-Za-z0-9]{21}[AQgw]$")
