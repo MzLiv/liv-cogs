@@ -1,0 +1,26 @@
+rank: 2
+name: bad-word
+priority: 1
+event: on-message
+if:
+   - if-any:
+     - message-matches-any: ["*chinam?n*"]
+     - message-matches-any: ["*f?ggot*"]
+     - message-matches-any: ["*fatso*"]
+     - message-matches-any: ["*nig-nog*"]
+     - message-matches-any: ["*n?gga*"]
+     - message-matches-any: ["*n?gger*"]
+     - message-matches-any: ["*n?gguh*"]
+     - message-matches-any: ["*pickaninnie*"]
+     - message-matches-any: ["*pickaninny*"]
+     - message-matches-any: ["*trannie*"]
+     - message-matches-any: ["*tranny*"]
+     - message-matches-any: ["*wigger*"]
+do:
+  - delete-user-message:
+  - send-message: [$channel_id, "That sort of language is not tolerated. If you continue to use offencive language you will be automatically banned."]
+  - delete-last-message-sent-after: 15 seconds
+  - add-custom-heatpoint: ["filter-$user_id", 5 minutes]
+  - custom-heat-more-than: ["filter-$user_id", 4] # check if the user triggered this rule 5 or more times
+  - if-true: # if they did, ban them
+      - ban-user-and-delete: 0

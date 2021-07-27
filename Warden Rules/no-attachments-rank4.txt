@@ -1,0 +1,10 @@
+rank: 4
+name: no-attachments-rank4
+event: [on-message, on-message-edit]
+if:
+  - message-has-attachment: true
+do:
+  - delete-user-message:
+  - send-message: [$channel_id, "$user_mention Sorry, you are not allowed to send attachments."]
+  - delete-last-message-sent-after: 15 seconds
+  - notify-staff-with-embed: ["Attachment removed", "New user $user_mention attempted to send an attachment in $channel_mention\nMessage content, if any: $message\n[Click to jump]($message_link)"]
